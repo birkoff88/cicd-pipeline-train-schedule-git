@@ -1,15 +1,9 @@
+// Jenkinsfile
 pipeline {
   agent any
 
   stages {
-    stage('Build') {
-      steps {
-        echo 'Running build automation'
-      }
-    }
-
-    stage('DeployToStaging') {
-      when { branch 'master' } // change to 'main' if needed
+    stage('Auth & Touch') {
       steps {
         withCredentials([usernamePassword(
           credentialsId: 'webserver_login',
@@ -21,16 +15,12 @@ pipeline {
             continueOnError: false,
             publishers: [
               sshPublisherDesc(
-                configName: 'staging', // must match the server name in Jenkins global config
-                sshCredentials: [
-                  username: "${USERNAME}",
-                  encryptedPassphrase: "${USERPASS}" // used as password when no key/keyPath is set
-                ],
+                configName: 'staging', // this server must exist in Manage Jenkins > Configure System
+                // If your server is already configured with creds, you can drop sshCredentials below.
+                sshCredentials: [ username: "${USERNAME}", encryptedPassphrase: "${USERPASS}" ],
                 transfers: [
                   sshTransfer(
-                    // Just run a command remotely to prove auth works
-                    execCommand: "touch /tmp/jenkins_auth_test_${BUILD_NUMBER} && echo \"created by Jenkins at $(date)\" >> /tmp/jenkins_auth_test_${BUILD_NUMBER}",
-                    usePty: true // set to false if your sudoers/TTY isn't required
+                    execCommand: "touch /tmp/jenkins_auth_ok_${env.BUILD_NUMBER}"
                   )
                 ],
                 verbose: true
@@ -42,4 +32,3 @@ pipeline {
     }
   }
 }
-
