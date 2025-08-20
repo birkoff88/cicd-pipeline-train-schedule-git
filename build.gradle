@@ -1,13 +1,49 @@
 plugins {
-    id 'java'
+    id 'base'                                        // standard 'build' lifecycle
+    id 'com.github.node-gradle.node' version '7.1.0' // maintained Node plugin
 }
 
-tasks.register('distZip', Zip) {
-    from("$buildDir/libs")          // take the compiled jar(s)
-    archiveFileName = "trainSchedule.zip"
-    destinationDirectory = file("$rootDir/dist")  // put it in a top-level dist folder
+node {
+    download = true
+    // Use a legacy Node compatible with the old lockfile/deps (jade, mkdirp@0.5.x, etc.)
+    // You can override at runtime with:  NODE_VERSION=14.21.3 ./gradlew build
+    version = System.getenv('NODE_VERSION') ?: '10.24.1'
+    nodeProjectDir = projectDir
 }
 
-tasks.named('build') {
-    finalizedBy('distZip')
+// Use plugin's built-in npmInstall
+def npmInstall = tasks.named("npmInstall")
+
+// npm test (run only if script exists)
+tasks.register("npmTest", com.github.gradle.node.npm.task.NpmTask) {
+    dependsOn(npmInstall)
+    args.set(["run", "test"])
+    // Skip gracefully if package.json has no "test" script
+    onlyIf { file("package.json").exists() && file("package.json").text.contains('"test"') }
+}
+
+// npm run build (run only if script exists)
+tasks.register("npmBuild", com.github.gradle.node.npm.task.NpmTask) {
+    dependsOn(npmInstall)
+    args.set(["run", "build"])
+    // Skip gracefully if package.json has no "build" script
+    onlyIf { file("package.json").exists() && file("package.json").text.contains('"build"') }
+}
+
+// Zip task (modern API)
+tasks.register("distZip", Zip) {
+    dependsOn("npmBuild", "npmTest")
+
+    from(".") {
+        include "*"
+        include "bin/**", "data/**", "node_modules/**", "public/**", "routes/**", "views/**"
+        exclude ".git/**", "build/**", "dist/**"
+    }
+    archiveBaseName.set("trainSchedule")
+    destinationDirectory.set(layout.projectDirectory.dir("dist"))
+}
+
+// Hook into the standard build lifecycle
+tasks.named("build") {
+    dependsOn("distZip")
 }
