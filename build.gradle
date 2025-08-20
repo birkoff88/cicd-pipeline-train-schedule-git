@@ -1,9 +1,13 @@
-task distZip(type: Zip) {
-    from 'build/libs'
-    archiveFileName = "trainSchedule.zip"
-    destinationDirectory = file("$buildDir/../dist")
+plugins {
+    id 'java'
 }
 
-build.finalizedBy(distZip)
+tasks.register('distZip', Zip) {
+    from("$buildDir/libs")          // take the compiled jar(s)
+    archiveFileName = "trainSchedule.zip"
+    destinationDirectory = file("$rootDir/dist")  // put it in a top-level dist folder
+}
 
-
+tasks.named('build') {
+    finalizedBy('distZip')
+}
