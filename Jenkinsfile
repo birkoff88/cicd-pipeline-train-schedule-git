@@ -1,4 +1,4 @@
-// Jenkinsfile — build locally, deploy via SSH (no systemctl)
+// Jenkinsfile
 pipeline {
   agent any
 
@@ -7,7 +7,7 @@ pipeline {
       steps {
         echo 'Running build automation'
         sh '''
-          set -euo pipefail
+          set -eu
           ./gradlew clean build --no-daemon
           mkdir -p dist
           # Create the zip if your build doesn't already produce it
@@ -24,7 +24,7 @@ pipeline {
     }
 
     stage('DeployToStaging') {
-      when { branch 'master' } // change to 'main' if needed
+      when { branch 'master' }
       steps {
         withCredentials([usernamePassword(
           credentialsId: 'webserver_login',
@@ -36,18 +36,17 @@ pipeline {
             continueOnError: false,
             publishers: [
               sshPublisherDesc(
-                configName: 'staging', // must match server in Manage Jenkins > Configure System
+                configName: 'staging',
                 sshCredentials: [ username: "${USERNAME}", encryptedPassphrase: "${USERPASS}" ],
                 transfers: [
-                  // Upload artifact to /tmp on the remote
                   sshTransfer(
                     sourceFiles: 'dist/trainSchedule.zip',
                     removePrefix: 'dist/',
                     remoteDirectory: '/tmp'
                   ),
-                  // Unpack to target dir (no systemctl)
                   sshTransfer(
-                    execCommand: "sudo mkdir -p /opt/train-schedule && sudo rm -rf /opt/train-schedule/* && unzip -o /tmp/trainSchedule.zip -d /opt/train-schedule && ls -la /opt/train-schedule"
+                    // no systemctl; just unpack
+                    execCommand: "mkdir -p \"$HOME/train-schedule\" && rm -rf \"$HOME/train-schedule\"/* && unzip -o /tmp/trainSchedule.zip -d \"$HOME/train-schedule\" && ls -la \"$HOME/train-schedule\""
                   )
                 ],
                 verbose: true
